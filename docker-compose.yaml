@@ -1,0 +1,108 @@
+version: '3'
+
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.3.2
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  kafka:
+    image: confluentinc/cp-server:7.3.2
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    ports:
+      - "9092:9092"
+
+  control-center:
+    image: confluentinc/cp-enterprise-control-center:7.3.2
+    depends_on:
+      - kafka
+    ports:
+      - "9021:9021"
+    environment:
+      CONTROL_CENTER_BOOTSTRAP_SERVERS: kafka:9092
+      CONTROL_CENTER_ZOOKEEPER_CONNECT: zookeeper:2181
+      CONTROL_CENTER_REPLICATION_FACTOR: 1
+      CONTROL_CENTER_INTERNAL_TOPICS_PARTITIONS: 1
+      CONTROL_CENTER_MONITORING_INTERCEPTOR_TOPIC_PARTITIONS: 1
+      CONFLUENT_METRICS_TOPIC_REPLICATION: 1
+      PORT: 9021
+
+  postgres:
+    image: postgres
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: grafanadb
+    volumes:
+      - ./postgres-init:/docker-entrypoint-initdb.d
+      - postgres-data:/var/lib/postgresql/data
+
+  prometheus:
+    image: prom/prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+
+  grafana:
+    image: grafana/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+
+  producer:
+      build:
+        context: ./kafka-producer
+      depends_on:
+        - kafka
+      environment:
+        KAFKA_TOPIC: test-topic
+        KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+  
+  kafka-reactor-consumer:
+      build:
+        context: ./kafka-react-consumer
+      ports:
+        - "8080:8080"
+      depends_on:
+        - kafka
+        - postgres
+      environment:
+        KAFKA_TOPIC: test-topic
+        KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+        KAFKA_CONSUMER_GROUP: kafka-reactor-consumer-group
+        DATABASE_PASSWD: password
+        DATABASE_USER: user
+        JDBC_URL_DATABASE: jdbc:postgresql://postgres:5432/grafanadb
+  
+  kafka-streams-consumer:
+      build:
+        context: ./kafka-stream
+      ports:
+        - "8081:8081"
+      depends_on:
+        - kafka
+        - postgres
+      environment:
+        KAFKA_TOPIC: test-topic
+        KAFKA_OUTPUT_TOPIC: test-topic-output
+        KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+        KAFKA_STREAM_GROUP: kafka-stream-consumer-group
+        DATABASE_PASSWD: password
+        DATABASE_USER: user
+        JDBC_URL_DATABASE: jdbc:postgresql://postgres:5432/grafanadb
+
+volumes:
+  postgres-data:
