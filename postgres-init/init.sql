@@ -1,0 +1,8 @@
+CREATE TABLE IF NOT EXISTS Transactions (
+    event_id varchar PRIMARY KEY,
+    handler VARCHAR(255) NOT NULL,
+    index INTEGER NOT NULL,
+    key VARCHAR(255) NOT NULL,
+    off_set BIGINT NOT NULL,
+    occurred_on TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);

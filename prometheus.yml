@@ -1,0 +1,7 @@
+scrape_configs:
+  - job_name: 'kafka-reactor-consumer'
+    static_configs:
+      - targets: ['kafka-reactor-consumer:8080']
+  - job_name: 'kafka-stream-consumer'
+    static_configs:
+      - targets: ['kafka-streams-consumer:8081']
